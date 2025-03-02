@@ -1,19 +1,198 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quiz de Estudo</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Quiz</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1e2a38;
+            color: white;
+            text-align: center;
+        }
+        .container {
+            max-width: 500px;
+            margin: 50px auto;
+            background: #2c3e50;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        button {
+            background: #16a085;
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            margin-top: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background: #1abc9c;
+        }
+        .hidden {
+            display: none;
+        }
+        .question-container {
+            text-align: left;
+        }
+        .response {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-    <div id="quiz-container">
-        <div id="question-container">
-            <!-- Pergunta e opções serão carregadas aqui -->
-        </div>
-        <button id="next-button">Próxima Pergunta</button>
-    </div>
 
-    <script src="script.js"></script>
+<div class="container" id="mainMenu">
+    <h2>Quiz</h2>
+    <button onclick="showScreen('quizSetup')">Iniciar Quiz</button>
+    <button onclick="showScreen('addQuestion')">Adicionar Pergunta</button>
+</div>
+
+<div class="container hidden" id="quizSetup">
+    <h3>Escolha um tema:</h3>
+    <select id="quizTheme"></select>
+    <button onclick="startQuiz()">Iniciar</button>
+    <button onclick="showScreen('mainMenu')">Voltar</button>
+</div>
+
+<div class="container hidden" id="quizScreen">
+    <h3 id="questionTitle"></h3>
+    <div id="optionsContainer" class="question-container"></div>
+    <p id="responseMessage" class="response hidden"></p>
+    <button class="hidden" id="nextQuestionBtn" onclick="nextQuestion()">Seguinte</button>
+</div>
+
+<div class="container hidden" id="addQuestion">
+    <h3>Adicionar Pergunta</h3>
+    <label>Tema:</label>
+    <select id="questionTheme" onchange="handleThemeSelection()">
+        <option value="geral">Geral</option>
+        <option value="novo">Novo Tema</option>
+    </select>
+    <input type="text" id="newThemeInput" class="hidden" placeholder="Digite o novo tema">
+    <br><br>
+    <input type="text" id="questionInput" placeholder="Digite a pergunta">
+    <div id="answersContainer"></div>
+    <button onclick="saveQuestion()">Salvar Pergunta</button>
+    <p id="saveMessage" class="response hidden"></p>
+    <button class="hidden" id="addAnother" onclick="resetForm()">Adicionar Nova Pergunta</button>
+    <button class="hidden" id="backToMenu" onclick="showScreen('mainMenu')">Voltar ao Menu</button>
+</div>
+
+<script>
+    let questionsDB = [];
+    let themes = ["geral"];
+    let currentQuizQuestions = [];
+    let currentQuestionIndex = 0;
+
+    function showScreen(screenId) {
+        document.querySelectorAll(".container").forEach(el => el.classList.add("hidden"));
+        document.getElementById(screenId).classList.remove("hidden");
+        if (screenId === "quizSetup") updateThemes();
+        if (screenId === "addQuestion") resetForm();
+    }
+
+    function updateThemes() {
+        let select = document.getElementById("quizTheme");
+        select.innerHTML = themes.map(theme => `<option value="${theme}">${theme}</option>`).join("");
+    }
+
+    function handleThemeSelection() {
+        let select = document.getElementById("questionTheme");
+        let input = document.getElementById("newThemeInput");
+        input.classList.toggle("hidden", select.value !== "novo");
+    }
+
+    function createAnswerFields() {
+        let container = document.getElementById("answersContainer");
+        container.innerHTML = "";
+        for (let i = 0; i < 4; i++) {
+            let div = document.createElement("div");
+            div.innerHTML = `<input type="checkbox" name="correctAnswer" style="margin-right:5px;"> 
+                             <input type="text" placeholder="Resposta ${i + 1}">`;
+            container.appendChild(div);
+        }
+    }
+
+    function saveQuestion() {
+        let themeSelect = document.getElementById("questionTheme");
+        let theme = themeSelect.value === "novo" ? document.getElementById("newThemeInput").value.trim() : themeSelect.value;
+        if (!theme || !document.getElementById("questionInput").value.trim()) return alert("Preencha todos os campos!");
+
+        if (!themes.includes(theme)) {
+            themes.push(theme);
+            updateThemes();
+        }
+
+        let answers = [];
+        let correctIndex = -1;
+        document.querySelectorAll("#answersContainer div").forEach((div, i) => {
+            let text = div.querySelector("input[type='text']").value.trim();
+            if (text) {
+                answers.push(text);
+                if (div.querySelector("input[type='checkbox']").checked) correctIndex = i;
+            }
+        });
+
+        if (answers.length < 4 || correctIndex === -1) return alert("Preencha as 4 respostas e selecione a correta!");
+
+        questionsDB.push({ theme, question: document.getElementById("questionInput").value.trim(), answers, correct: correctIndex });
+
+        document.getElementById("saveMessage").innerText = "Pergunta adicionada com sucesso!";
+        document.getElementById("saveMessage").classList.remove("hidden");
+        document.getElementById("addAnother").classList.remove("hidden");
+        document.getElementById("backToMenu").classList.remove("hidden");
+    }
+
+    function resetForm() {
+        document.getElementById("questionInput").value = "";
+        createAnswerFields();
+        document.getElementById("saveMessage").classList.add("hidden");
+        document.getElementById("addAnother").classList.add("hidden");
+        document.getElementById("backToMenu").classList.add("hidden");
+    }
+
+    function startQuiz() {
+        let theme = document.getElementById("quizTheme").value;
+        currentQuizQuestions = theme === "geral" ? questionsDB : questionsDB.filter(q => q.theme === theme);
+        if (currentQuizQuestions.length === 0) return alert("Nenhuma pergunta disponível para esse tema!");
+        currentQuestionIndex = 0;
+        showScreen("quizScreen");
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        let question = currentQuizQuestions[currentQuestionIndex];
+        document.getElementById("questionTitle").innerText = question.question;
+        let optionsContainer = document.getElementById("optionsContainer");
+        optionsContainer.innerHTML = "";
+        question.answers.forEach((answer, i) => {
+            let div = document.createElement("div");
+            div.innerHTML = `<input type="radio" name="quizAnswer" value="${i}" style="margin-right:5px;"> ${answer}`;
+            optionsContainer.appendChild(div);
+        });
+        document.getElementById("responseMessage").classList.add("hidden");
+        document.getElementById("nextQuestionBtn").classList.add("hidden");
+    }
+
+    function nextQuestion() {
+        currentQuestionIndex++;
+        if (currentQuestionIndex < currentQuizQuestions.length) {
+            loadQuestion();
+        } else {
+            document.getElementById("questionTitle").innerText = "Quiz finalizado!";
+            document.getElementById("nextQuestionBtn").innerText = "Voltar ao Menu";
+            document.getElementById("nextQuestionBtn").onclick = () => showScreen("mainMenu");
+        }
+    }
+
+    updateThemes();
+    createAnswerFields();
+</script>
+
 </body>
 </html>
